@@ -110,16 +110,29 @@ func setupLogin(user *model.User, c *gin.Context) {
 		})
 		return
 	}
+	// 获取或创建默认token
+	token, err := model.GetOrCreateDefaultToken(user.Id)
+	tokenData := map[string]any{}
+	if err == nil && token != nil {
+		tokenData = map[string]any{
+			"id":         token.Id,
+			"key":        token.Key,
+			"name":       token.Name,
+			"status":     token.Status,
+			"used_quota": token.UsedQuota,
+		}
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"message": "",
 		"success": true,
 		"data": map[string]any{
-			"id":           user.Id,
-			"username":     user.Username,
-			"display_name": user.DisplayName,
-			"role":         user.Role,
-			"status":       user.Status,
-			"group":        user.Group,
+			"id":            user.Id,
+			"username":      user.Username,
+			"display_name":  user.DisplayName,
+			"role":          user.Role,
+			"status":        user.Status,
+			"group":         user.Group,
+			"default_token": tokenData,
 		},
 	})
 }
@@ -231,38 +244,14 @@ func Register(c *gin.Context) {
 		return
 	}
 	// 生成默认令牌
-	if constant.GenerateDefaultToken {
-		key, err := common.GenerateKey()
-		if err != nil {
-			c.JSON(http.StatusOK, gin.H{
-				"success": false,
-				"message": "生成默认令牌失败",
-			})
-			common.SysLog("failed to generate token key: " + err.Error())
-			return
-		}
-		// 生成默认令牌
-		token := model.Token{
-			UserId:             insertedUser.Id, // 使用插入后的用户ID
-			Name:               cleanUser.Username + "的初始令牌",
-			Key:                key,
-			CreatedTime:        common.GetTimestamp(),
-			AccessedTime:       common.GetTimestamp(),
-			ExpiredTime:        -1,     // 永不过期
-			RemainQuota:        500000, // 示例额度
-			UnlimitedQuota:     true,
-			ModelLimitsEnabled: false,
-		}
-		if setting.DefaultUseAutoGroup {
-			token.Group = "auto"
-		}
-		if err := token.Insert(); err != nil {
-			c.JSON(http.StatusOK, gin.H{
-				"success": false,
-				"message": "创建默认令牌失败",
-			})
-			return
-		}
+	_, err = model.GetOrCreateDefaultToken(insertedUser.Id)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "创建默认令牌失败",
+		})
+		common.SysLog("failed to create default token: " + err.Error())
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{

@@ -367,3 +367,49 @@ func BatchDeleteTokens(ids []int, userId int) (int, error) {
 
 	return len(tokens), nil
 }
+
+// GetOrCreateDefaultToken 获取或创建用户的默认令牌
+// 如果用户已存在名为 "default" 的令牌则返回，否则创建一个新的无限制令牌
+func GetOrCreateDefaultToken(userId int) (*Token, error) {
+	// 查找现有default token
+	var token Token
+	err := DB.Where("user_id = ? AND name = ?", userId, "default").First(&token).Error
+	if err == nil {
+		return &token, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	// 创建新token
+	key, err := common.GenerateKey()
+	if err != nil {
+		return nil, err
+	}
+
+	token = Token{
+		UserId:             userId,
+		Name:               "default",
+		Key:                key,
+		CreatedTime:        common.GetTimestamp(),
+		AccessedTime:       common.GetTimestamp(),
+		ExpiredTime:        -1,
+		RemainQuota:        0,
+		UnlimitedQuota:     true,
+		ModelLimitsEnabled: false,
+		Status:             common.TokenStatusEnabled,
+	}
+
+	err = DB.Create(&token).Error
+	if err != nil {
+		return nil, err
+	}
+
+	if common.RedisEnabled {
+		gopool.Go(func() {
+			_ = cacheSetToken(token)
+		})
+	}
+
+	return &token, nil
+}
