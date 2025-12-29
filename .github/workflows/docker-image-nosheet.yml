@@ -45,7 +45,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: calciumion/new-api
+          images: eddiearc6/new-api
 
       - name: Build & push Docker image
         uses: docker/build-push-action@v6
@@ -54,8 +54,8 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            calciumion/new-api:nosheet
-            calciumion/new-api:${{ steps.version.outputs.value }}
+            eddiearc6/new-api:nosheet
+            eddiearc6/new-api:${{ steps.version.outputs.value }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
